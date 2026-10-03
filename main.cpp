@@ -1,67 +1,74 @@
-#include <windows.h>
+ #include <windows.h>
 
 #pragma comment(lib, "user32.lib")
 
-// Переменные состояния
-bool g_feature1 = false;
-bool g_feature2 = false;
+bool g_show_window = false;
+HWND g_hwnd = NULL;
 
-// Обработка событий окна
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
     case WM_COMMAND:
-        // Нажатие на кнопки/галочки
-        if (LOWORD(wParam) == 1) { // Чекбокс 1
-            g_feature1 = !g_feature1;
-            CheckDlgButton(hwnd, 1, g_feature1 ? BST_CHECKED : BST_CHECKED);
-        }
-        else if (LOWORD(wParam) == 2) { // Чекбокс 2
-            g_feature2 = !g_feature2;
-            CheckDlgButton(hwnd, 2, g_feature2 ? BST_CHECKED : BST_CHECKED);
+        if (LOWORD(wParam) == 1) {
+            // Действие для кнопки 1
         }
         break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
+    case WM_CLOSE:
+        ShowWindow(hwnd, SW_HIDE);
+        g_show_window = false;
+        return 0;
     default:
-        return DefWindowProc(hwnd, msg, wParam, lParam);
+        return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
     return 0;
 }
 
-// Поток для создания графического окна
 DWORD WINAPI UIThread(LPVOID lpParam) {
     HINSTANCE hInstance = GetModuleHandle(NULL);
     
-    WNDCLASS wc = { 0 };
+    WNDCLASSW wc = { 0 };
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = "CustomWindow32";
+    wc.lpszClassName = L"CustomNavClass";
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
-    RegisterClass(&wc);
+    RegisterClassW(&wc);
 
-    // Создаем стандартное окно
-    HWND hwnd = CreateWindowA(
-        "CustomWindow32", "Control Panel",
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-        100, 100, 300, 200,
+    // Создаем окно с широкими символами (wchar_t) для поддержки кириллицы
+    g_hwnd = CreateWindowW(
+        L"CustomNavClass", L"Меню управления",
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+        100, 100, 280, 180,
         NULL, NULL, hInstance, NULL
     );
 
-    // Добавляем элементы управления (кнопки/галочки)
-    CreateWindowA("BUTTON", "Включить визуализацию 1", 
+    CreateWindowW(L"BUTTON", L"Визуализация 1", 
         WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 
-        20, 20, 240, 30, hwnd, (HMENU)1, hInstance, NULL);
+        20, 20, 220, 30, g_hwnd, (HMENU)1, hInstance, NULL);
 
-    CreateWindowA("BUTTON", "Включить визуализацию 2", 
+    CreateWindowW(L"BUTTON", L"Визуализация 2", 
         WS_VISIBLE | WS_CHILD | BS_CHECKBOX, 
-        20, 60, 240, 30, hwnd, (HMENU)2, hInstance, NULL);
+        20, 60, 220, 30, g_hwnd, (HMENU)2, hInstance, NULL);
 
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    bool key_down = false;
+
+    while (true) {
+        // Цикл обработки Right Shift
+        if (GetAsyncKeyState(VK_RSHIFT) & 0x8000) {
+            if (!key_down) {
+                g_show_window = !g_show_window;
+                ShowWindow(g_hwnd, g_show_window ? SW_SHOW : SW_HIDE);
+                key_down = true;
+            }
+        } else {
+            key_down = false;
+        }
+
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        Sleep(10);
     }
 
     return 0;
